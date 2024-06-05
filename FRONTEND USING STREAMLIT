@@ -1,0 +1,136 @@
+import streamlit as st
+import mysql.connector
+from mysql.connector import errorcode
+
+# Configure MySQL connection
+def create_connection():
+    try:
+        conn = mysql.connector.connect(
+            host="localhost",
+            user="root",
+            password="$amarth123",
+            database="Spotify"
+        )
+        return conn
+    except mysql.connector.Error as err:
+        if err.errno == errorcode.ER_ACCESS_DENIED_ERROR:
+            st.error("Something is wrong with your user name or password")
+        elif err.errno == errorcode.ER_BAD_DB_ERROR:
+            st.error("Database does not exist")
+        else:
+            st.error(err)
+        return None
+
+# Function to execute the trigger creation
+def create_trigger(cursor):
+    trigger_query = '''
+    CREATE TRIGGER popularity_changes
+    AFTER UPDATE ON tracks
+    FOR EACH ROW
+    BEGIN
+        IF NEW.popularity != OLD.popularity THEN
+            INSERT INTO audit (id, name, artist, popularity)
+            VALUES (OLD.id, OLD.name, OLD.artist, NEW.popularity);
+        END IF;
+    END
+    '''
+    try:
+        cursor.execute(trigger_query)
+    except mysql.connector.Error as err:
+        if err.errno == errorcode.ER_TRG_ALREADY_EXISTS:
+            pass  # Trigger already exists
+        else:
+            st.error(f"Error creating trigger: {err}")
+    cursor.execute("SET sql_safe_updates = 0;")
+
+# Streamlit app layout
+st.set_page_config(page_title="Spotify Tracks Database", layout="wide", initial_sidebar_state="expanded")
+
+# Sidebar for user inputs
+st.sidebar.header("User Input")
+limit_options = [10, 20, 50, 100, 'ALL']
+limit = st.sidebar.selectbox("Number of rows to display", limit_options, index=0)
+
+
+limit_query = "" if limit == 'ALL' else f"LIMIT {limit}"
+
+# Main content
+st.title("Spotify Tracks Database")
+st.header("Tracks Table")
+
+# Display tracks table
+conn = create_connection()
+if conn:
+    try:
+        cursor = conn.cursor()
+
+        # Create trigger for popularity changes
+        create_trigger(cursor)
+
+        cursor.execute(f"SELECT * FROM tracks {limit_query}")
+        tracks_data = cursor.fetchall()
+        st.table(tracks_data)
+
+        # All albums of an artist
+        st.header("All Albums of an Artist")
+        artist_name_albums = st.text_input("Artist for Albums", value="Katy Perry")
+        if st.button("Get Albums of Artist"):
+            cursor.callproc('all_album', [artist_name_albums])
+            for result in cursor.stored_results():
+                albums_data = result.fetchall()
+                st.table(albums_data if limit == 'ALL' else albums_data[:limit])
+
+        # Tracks in Album
+        st.header("Tracks in Album")
+        artist_name_input = st.text_input("Artist Name for Album Tracks", value="Maroon 5")
+        album_name_input = st.text_input("Album Name for Album Tracks", value="V")
+        if st.button("Get Tracks in Album"):
+            cursor.callproc('order_track_no', [artist_name_input, album_name_input])
+            for result in cursor.stored_results():
+                order_data = result.fetchall()
+                columns = ['Track Name', 'Popularity']
+                st.table(order_data if limit == 'ALL' else order_data[:limit])
+
+        # Update popularity
+        st.header("Update Track Popularity")
+        track_name = st.text_input("Track Name to Update Popularity", value="Maps")
+        new_popularity = st.number_input("New Popularity", min_value=0, max_value=100, value=95)
+        if st.button("Update Popularity"):
+            cursor.execute("UPDATE tracks SET popularity = %s WHERE name = %s", (new_popularity, track_name))
+            conn.commit()
+            st.success("Popularity updated successfully!")
+
+        # Audit table
+        st.header("Audit Table")
+        cursor.execute(f"SELECT * FROM audit {limit_query}")
+        audit_data = cursor.fetchall()
+        st.table(audit_data)
+
+        # Track duration
+        st.header("Track Duration")
+        track_name_duration = st.text_input("Track Name for Duration")
+        if st.button("Get Track Duration"):
+            cursor.execute("SELECT name, duration_ms FROM tracks WHERE name = %s", (track_name_duration,))
+            track_duration_data = cursor.fetchall()
+            if track_duration_data:
+                track_name, duration_ms = track_duration_data[0]
+                duration_minutes = duration_ms / 60000
+                st.write(f"The duration of '{track_name}' is {duration_minutes:.2f} minutes.")
+            else:
+                st.write("Track not found.")
+    except mysql.connector.Error as err:
+        st.error(f"Error: {err}")
+    finally:
+        cursor.close()
+        conn.close()
+else:
+    st.error("Failed to connect to the database.")
+
+
+
+
+
+
+
+
+
