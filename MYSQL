@@ -1,0 +1,51 @@
+create database Spotify;
+use Spotify;
+
+#TRACKS TABLE
+select * from tracks;
+
+#STORED PROCEDURE FOR GETTING THE TRACKS IN A ALBUM OF AN ARTIST IN ORDER
+delimiter //
+create procedure order_track_no(in artist_name varchar(50),album_name varchar(50))
+begin
+    select artist,album,name,popularity,track_number
+    from tracks
+    where artist=artist_name and album=album_name
+    order by track_number;
+end //
+delimiter ;
+call order_track_no("Maroon 5","V");
+
+#CREATE AN AUDIT TABLE
+create table audit(sr int auto_increment primary key,id varchar(50),name varchar(50),artist varchar(50),popularity int);
+
+#CREATING TRIGGER FOR POPULARITY AFTER BEING UPDATED
+delimiter ??
+create trigger popularity_changes
+after update on tracks
+for each row
+begin
+    if new.popularity != old.popularity then
+        insert into audit (sr, id, name, artist, popularity)
+        values (sr,old.id, old.name, old.artist, new.popularity);
+    end if;
+end ??
+delimiter ;
+set sql_safe_updates = 0;
+update tracks set popularity = 95 where name = "Maps";
+
+#AUDIT TABLE
+select * from audit;
+
+#TO GET HIGHEST DURATION SONGS 
+select name,max(duration_ms) as max_duration_songs from tracks group by name order by max_duration_songs desc;
+
+#TO GET ALL ALBUMS OF ARTIST
+delimiter ??
+create procedure all_album(in artist varchar(50))
+begin
+select artist,album from tracks
+where album=album;
+end ??
+delimiter ;
+call all_album("Katy Perry")
