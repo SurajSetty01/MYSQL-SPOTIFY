@@ -1,6 +1,8 @@
 import streamlit as st
 import mysql.connector
 from mysql.connector import errorcode
+import secrets
+import string
 
 # Configure MySQL connection
 def create_connection():
@@ -43,6 +45,12 @@ def create_trigger(cursor):
             st.error(f"Error creating trigger: {err}")
     cursor.execute("SET sql_safe_updates = 0;")
 
+# Generate a random string
+def generate_random_string(length=22):
+    characters = string.ascii_letters + string.digits
+    random_string = ''.join(secrets.choice(characters) for _ in range(length))
+    return random_string
+
 # Streamlit app layout
 st.set_page_config(page_title="Spotify Tracks Database", layout="wide", initial_sidebar_state="expanded")
 
@@ -50,7 +58,6 @@ st.set_page_config(page_title="Spotify Tracks Database", layout="wide", initial_
 st.sidebar.header("User Input")
 limit_options = [10, 20, 50, 100, 'ALL']
 limit = st.sidebar.selectbox("Number of rows to display", limit_options, index=0)
-
 
 limit_query = "" if limit == 'ALL' else f"LIMIT {limit}"
 
@@ -70,6 +77,40 @@ if conn:
         cursor.execute(f"SELECT * FROM tracks {limit_query}")
         tracks_data = cursor.fetchall()
         st.table(tracks_data)
+
+        # Add Data To The Table section
+        st.header("Add Data To The Table")
+        song = st.text_input("Song")
+        artist_name_albums = st.text_input("Artist for Albums")
+        album_name = st.text_input("Album name")
+        duration_ms = st.text_input("Duration of Song")
+        popularity_of_song = st.text_input("Popularity of Song")
+        if st.button("Add Track"):
+            if song and artist_name_albums and album_name and popularity_of_song:
+                random_value = generate_random_string()
+
+                # Check if album exists and get the highest track number
+                cursor.callproc('all_album', [artist_name_albums])
+                albums_data = {}
+                for result in cursor.stored_results():
+                    for album in result.fetchall():
+                        albums_data[album[0]] = album[1]  # Assuming album[0] is album name and album[1] is track numbers
+
+                if album_name in albums_data:
+                    track_number = max(albums_data[album_name]) + 1  # Get the next track number
+                else:
+                    track_number = 1  # Start from 1 if the album does not exist
+
+                # Insert data into the database
+                cursor.execute(
+                    "INSERT INTO tracks (id, name , artist, album, duration_ms, popularity, track_number) VALUES (%s, %s, %s,%s,%s, %s, %s)",
+                    (random_value, song, artist_name_albums, album_name,duration_ms,popularity_of_song,track_number)
+                )
+                conn.commit()
+
+                st.success("Data added successfully!")
+            else:
+                st.error("Please fill all fields")
 
         # All albums of an artist
         st.header("All Albums of an Artist")
@@ -125,12 +166,3 @@ if conn:
         conn.close()
 else:
     st.error("Failed to connect to the database.")
-
-
-
-
-
-
-
-
-
