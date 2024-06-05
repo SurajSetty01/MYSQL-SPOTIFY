@@ -1,0 +1,176 @@
+#CONNECTION SPOTIFY API - PYTHON
+client_id = 'ca2ea7f8b4a54e1fadda44783f90a10e'
+client_secret = '2b9b3f09c9d74da48ec3cbeec4f8dcf9'
+
+client_credentials_manager = SpotifyClientCredentials(client_id=client_id, client_secret=client_secret)
+sp = spotipy.Spotify(client_credentials_manager=client_credentials_manager)
+
+
+db = mysql.connector.connect(
+    host="localhost",
+    password="$amarth123",
+    user="root",
+    database="Spotify"
+)
+
+if db.is_connected():
+    print("Connection successful")
+else:
+    print("Not successful")
+
+cursor = db.cursor()
+
+create_table_query = """
+CREATE TABLE IF NOT EXISTS tracks (
+    id VARCHAR(255) PRIMARY KEY,
+    name VARCHAR(255),
+    artist VARCHAR(255),
+    album VARCHAR(255),
+    duration_ms INT,
+    popularity INT,
+    track_number INT
+)
+"""
+
+cursor.execute(create_table_query)
+
+
+# List of artist names
+artist_names = [
+    "Maroon 5", "Ed Sheeran", "Taylor Swift", "Adele", "Beyoncé",
+    "Coldplay", "Drake", "Eminem", "Foo Fighters", "Green Day",
+    "Halsey", "Imagine Dragons", "Justin Bieber", "Kanye West",
+    "Lady Gaga", "Miley Cyrus", "Nicki Minaj", "One Direction",
+    "Post Malone", "Queen", "Rihanna", "Shawn Mendes", "The Beatles",
+    "U2", "Van Halen", "Whitney Houston", "X Ambassadors", "Yanni",
+    "Zara Larsson", "ABBA", "Arctic Monkeys", "Britney Spears",
+    "Bruno Mars", "Calvin Harris", "Cardi B", "David Guetta",
+    "Dua Lipa", "Elton John", "Evanescence", "Fleetwood Mac",
+    "Guns N' Roses", "Harry Styles", "Imagine Dragons", "Jennifer Lopez",
+    "John Legend", "Justin Timberlake", "Katy Perry", "Kelly Clarkson",
+    "Lana Del Rey", "Lil Wayne", "Linkin Park", "Madonna",
+    "Metallica", "Michael Jackson", "Migos", "Nirvana",
+    "Oasis", "Panic! At The Disco", "Pink", "Radiohead",
+    "Red Hot Chili Peppers", "Sia", "The Chainsmokers", "The Weeknd",
+    "Tina Turner", "Twenty One Pilots", "Usher", "Whitney Houston",
+    "Will Smith", "Wiz Khalifa", "Ariana Grande", "Billie Eilish",
+    "Camila Cabello", "Charlie Puth", "Demi Lovato", "Jason Derulo",
+    "Khalid", "Lizzo", "Lorde", "Marshmello", "Meghan Trainor",
+    "Niall Horan", "P!nk", "Selena Gomez", "Sia", "The Chainsmokers",
+    "The Weeknd", "Tina Turner", "Twenty One Pilots", "Usher",
+    "Whitney Houston", "Will Smith", "Wiz Khalifa"
+]
+
+
+for artist_name in artist_names:
+    results = sp.search(q='artist:' + artist_name, type='artist')
+    if results['artists']['items']:
+        artist_id = results['artists']['items'][0]['id']
+        top_tracks = sp.artist_top_tracks(artist_id)
+        for track in top_tracks['tracks']:
+            track_id = track['id']
+            track_name = track['name']
+            artist_name = track['artists'][0]['name']
+            album_name = track['album']['name']
+            duration_ms = track['duration_ms']
+            popularity = track['popularity']
+            track_number = track['track_number']
+
+            insert_query = """
+            INSERT INTO tracks (id, name, artist, album, duration_ms, popularity, track_number)
+            VALUES (%s, %s, %s, %s, %s, %s, %s)
+            ON DUPLICATE KEY UPDATE
+                name = VALUES(name),
+                artist = VALUES(artist),
+                album = VALUES(album),
+                duration_ms = VALUES(duration_ms),
+                popularity = VALUES(popularity),
+                track_number = VALUES(track_number)
+            """
+
+            cursor.execute(insert_query, (track_id, track_name, artist_name, album_name, duration_ms, popularity, track_number))
+    else:
+        print(f"No artist found with the name '{artist_name}'.")
+
+
+db.commit()
+db.close()
+
+#EXAMPLE OF HOW DATA IS STORED
+'''{
+  "id": "3n3Ppam7vgaVa1iaRUc9Lp",
+  "name": "Blinding Lights",
+  "artists": [
+    {
+      "id": "1Xyo4u8uXC1ZmMpatF05PJ",
+      "name": "The Weeknd",
+      "type": "artist",
+      "uri": "spotify:artist:1Xyo4u8uXC1ZmMpatF05PJ",
+      "external_urls": {
+        "spotify": "https://open.spotify.com/artist/1Xyo4u8uXC1ZmMpatF05PJ"
+      },
+      "href": "https://api.spotify.com/v1/artists/1Xyo4u8uXC1ZmMpatF05PJ"
+    }
+  ],
+  "album": {
+    "id": "4yP0hdKOZPNshxUOjY0cZj",
+    "name": "After Hours",
+    "release_date": "2020-03-20",
+    "release_date_precision": "day",
+    "total_tracks": 14,
+    "type": "album",
+    "uri": "spotify:album:4yP0hdKOZPNshxUOjY0cZj",
+    "images": [
+      {
+        "height": 640,
+        "url": "https://i.scdn.co/image/ab6761610000e5eb5f0f8f25f121348b12aa23db",
+        "width": 640
+      },
+      {
+        "height": 300,
+        "url": "https://i.scdn.co/image/ab6761610000e5eb5f0f8f25f121348b12aa23db",
+        "width": 300
+      },
+      {
+        "height": 64,
+        "url": "https://i.scdn.co/image/ab6761610000e5eb5f0f8f25f121348b12aa23db",
+        "width": 64
+      }
+    ],
+    "artists": [
+      {
+        "id": "1Xyo4u8uXC1ZmMpatF05PJ",
+        "name": "The Weeknd",
+        "type": "artist",
+        "uri": "spotify:artist:1Xyo4u8uXC1ZmMpatF05PJ",
+        "external_urls": {
+          "spotify": "https://open.spotify.com/artist/1Xyo4u8uXC1ZmMpatF05PJ"
+        },
+        "href": "https://api.spotify.com/v1/artists/1Xyo4u8uXC1ZmMpatF05PJ"
+      }
+    ],
+    "external_urls": {
+      "spotify": "https://open.spotify.com/album/4yP0hdKOZPNshxUOjY0cZj"
+    },
+    "href": "https://api.spotify.com/v1/albums/4yP0hdKOZPNshxUOjY0cZj"
+  },
+  "available_markets": ["US", "CA", "MX"],
+  "duration_ms": 200040,
+  "explicit": false,
+  "external_ids": {
+    "isrc": "USUM71900764"
+  },
+  "external_urls": {
+    "spotify": "https://open.spotify.com/track/3n3Ppam7vgaVa1iaRUc9Lp"
+  },
+  "href": "https://api.spotify.com/v1/tracks/3n3Ppam7vgaVa1iaRUc9Lp",
+  "is_local": false,
+  "popularity": 95,
+  "preview_url": "https://p.scdn.co/mp3-preview/8ff1b2f80a9b9ff0a6f734dbfc2b4cf6d60b41b3",
+  "track_number": 1,
+  "type": "track",
+  "uri": "spotify:track:3n3Ppam7vgaVa1iaRUc9Lp",
+  "disc_number": 1,
+  "linked_from": null
+}
+'''
