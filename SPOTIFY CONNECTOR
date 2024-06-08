@@ -1,4 +1,7 @@
-#CONNECTION SPOTIFY API - PYTHON
+import mysql.connector
+from spotipy.oauth2 import SpotifyClientCredentials
+import spotipy
+
 client_id = 'ca2ea7f8b4a54e1fadda44783f90a10e'
 client_secret = '2b9b3f09c9d74da48ec3cbeec4f8dcf9'
 
@@ -174,3 +177,9 @@ db.close()
   "linked_from": null
 }
 '''
+
+
+
+
+
+
