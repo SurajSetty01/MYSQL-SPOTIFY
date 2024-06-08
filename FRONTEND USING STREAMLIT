@@ -23,28 +23,6 @@ def create_connection():
             st.error(err)
         return None
 
-# Function to execute the trigger creation
-def create_trigger(cursor):
-    trigger_query = '''
-    CREATE TRIGGER popularity_changes
-    AFTER UPDATE ON tracks
-    FOR EACH ROW
-    BEGIN
-        IF NEW.popularity != OLD.popularity THEN
-            INSERT INTO audit (id, name, artist, popularity)
-            VALUES (OLD.id, OLD.name, OLD.artist, NEW.popularity);
-        END IF;
-    END
-    '''
-    try:
-        cursor.execute(trigger_query)
-    except mysql.connector.Error as err:
-        if err.errno == errorcode.ER_TRG_ALREADY_EXISTS:
-            pass  # Trigger already exists
-        else:
-            st.error(f"Error creating trigger: {err}")
-    cursor.execute("SET sql_safe_updates = 0;")
-
 # Generate a random string
 def generate_random_string(length=22):
     characters = string.ascii_letters + string.digits
@@ -70,9 +48,6 @@ conn = create_connection()
 if conn:
     try:
         cursor = conn.cursor()
-
-        # Create trigger for popularity changes
-        create_trigger(cursor)
 
         cursor.execute(f"SELECT * FROM tracks {limit_query}")
         tracks_data = cursor.fetchall()
@@ -112,9 +87,21 @@ if conn:
             else:
                 st.error("Please fill all fields")
 
+        # Delete Data From The Table section
+        st.header("Delete Data From The Table")
+        track_name_delete = st.text_input("Track Name to delete")
+        if st.button("Delete Track"):
+            if track_name_delete:
+                # Delete track from the database
+                cursor.execute("DELETE FROM tracks WHERE name = %s", (track_name_delete,))
+                conn.commit()
+                st.success("Track deleted successfully!")
+            else:
+                st.error("Please provide the Track Name to delete")
+
         # All albums of an artist
         st.header("All Albums of an Artist")
-        artist_name_albums = st.text_input("Artist for Albums", value="Katy Perry")
+        artist_name_albums = st.text_input("Artist for Albums",value=" ")
         if st.button("Get Albums of Artist"):
             cursor.callproc('all_album', [artist_name_albums])
             for result in cursor.stored_results():
@@ -123,29 +110,14 @@ if conn:
 
         # Tracks in Album
         st.header("Tracks in Album")
-        artist_name_input = st.text_input("Artist Name for Album Tracks", value="Maroon 5")
-        album_name_input = st.text_input("Album Name for Album Tracks", value="V")
+        artist_name_input = st.text_input("Artist Name for Album Tracks")
+        album_name_input = st.text_input("Album Name for Album Tracks")
         if st.button("Get Tracks in Album"):
             cursor.callproc('order_track_no', [artist_name_input, album_name_input])
             for result in cursor.stored_results():
                 order_data = result.fetchall()
                 columns = ['Track Name', 'Popularity']
                 st.table(order_data if limit == 'ALL' else order_data[:limit])
-
-        # Update popularity
-        st.header("Update Track Popularity")
-        track_name = st.text_input("Track Name to Update Popularity", value="Maps")
-        new_popularity = st.number_input("New Popularity", min_value=0, max_value=100, value=95)
-        if st.button("Update Popularity"):
-            cursor.execute("UPDATE tracks SET popularity = %s WHERE name = %s", (new_popularity, track_name))
-            conn.commit()
-            st.success("Popularity updated successfully!")
-
-        # Audit table
-        st.header("Audit Table")
-        cursor.execute(f"SELECT * FROM audit {limit_query}")
-        audit_data = cursor.fetchall()
-        st.table(audit_data)
 
         # Track duration
         st.header("Track Duration")
@@ -166,3 +138,4 @@ if conn:
         conn.close()
 else:
     st.error("Failed to connect to the database.")
+
